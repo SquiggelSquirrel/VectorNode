@@ -12,6 +12,7 @@ signal stroke_data_changed
 
 var is_vector_path = true
 export(float) var bake_interval = 10.0
+var _cached_bake_interval := 10.0
 var _curves := {}
 
 
@@ -69,6 +70,8 @@ func get_widths(start := 0, end := 0) -> Array:
 
 
 func get_shape_has_changed() -> bool:
+	if _cached_bake_interval != bake_interval:
+		return true
 	for point in get_point_nodes():
 		if point.get_shape_has_changed():
 			return true
@@ -83,6 +86,10 @@ func get_stroke_data_has_changed() -> bool:
 
 
 func set_shape_has_changed(new_value: bool) -> void:
+	if new_value:
+		_cached_bake_interval = 0.0
+	else:
+		_cached_bake_interval = bake_interval
 	for point in get_point_nodes():
 		point.set_shape_has_changed(new_value)
 
@@ -126,6 +133,7 @@ func _get_curves(start := 0, end := 0) -> Array:
 
 func _get_curve(start_point :Node, end_point :Node) -> Curve2D:
 	var curve := Curve2D.new()
+	curve.bake_interval = bake_interval
 	curve.add_point(
 			start_point.get_position_in(self),
 			start_point.get_handle_in(self),

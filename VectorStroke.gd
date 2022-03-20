@@ -6,8 +6,8 @@ class_name VectorStroke
 export(NodePath) var path_node_path setget set_path_node_path
 export(int) var start = 0 setget set_start
 export(int) var end = 0 setget set_end
-export(bool) var use_data_nodes_width = true setget set_use_data_nodes_width
-export(bool) var use_data_nodes_color = true setget set_use_data_nodes_color
+export(bool) var use_data_nodes_width = false setget set_use_data_nodes_width
+export(bool) var use_data_nodes_color = false setget set_use_data_nodes_color
 var is_vector_stroke := true
 var _needs_shape_update := false
 var _needs_data_update := false

@@ -5,6 +5,7 @@ class_name VectorFill
 
 export(NodePath) var path_node_path setget set_path_node_path
 var is_vector_fill := true
+onready var is_ready := true
 
 
 func _get_configuration_warning():
@@ -16,6 +17,8 @@ func _get_configuration_warning():
 func set_path_node_path(new_path :NodePath) -> void:
 	path_node_path = new_path
 	update_configuration_warning()
+	if is_ready and path_node_path:
+		update_fill()
 
 
 func update_fill():
