@@ -87,6 +87,7 @@ func update_data() -> void:
 		_update_color(path_node)
 	if use_data_nodes_width:
 		_update_width(path_node)
+	_needs_data_update = false
 
 
 func _get_path_node():
@@ -124,7 +125,7 @@ func _update_color(data_node :Node) -> void:
 
 
 func _update_width(data_node :Node) -> void:
-	var widths :Array = data_node.get_widths()
+	var widths :Array = data_node.get_widths(start,end)
 	if _segment_ratios.size() != widths.size():
 		return
 	if width_curve:
