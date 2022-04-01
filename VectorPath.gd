@@ -53,9 +53,13 @@ func get_shape(start := 0, end := 0) -> Array:
 	var curves = _get_curves(start, end)
 	var last_point
 	for curve in curves:
-		var baked_points = Array(curve.get_baked_points())
-		shape += baked_points.slice(0,-2)
-		last_point = baked_points[-1]
+		if curve is Curve2D:
+			var baked_points = Array(curve.get_baked_points())
+			shape += baked_points.slice(0,-2)
+			last_point = baked_points[-1]
+		else:
+			shape.append(curve[0])
+			last_point = curve[1]
 	if ! range_is_closed(start,end) and curves.size() > 0:
 		shape.append(last_point)
 	return shape
@@ -64,17 +68,11 @@ func get_shape(start := 0, end := 0) -> Array:
 func get_baked_lengths(start := 0, end := 0) -> Array:
 	var lengths := []
 	for curve in _get_curves(start, end):
-		lengths.append(curve.get_baked_length())
+		if curve is Curve2D:
+			lengths.append(curve.get_baked_length())
+		else:
+			lengths.append(curve[0].distance_to(curve[1]))
 	return lengths
-
-
-func get_curve(start_point :Node, end_point :Node) -> Curve2D:
-	if _curves.has([start_point,end_point]):
-		return _curves[[start_point,end_point]]
-	else:
-		var curve = _get_curve(start_point, end_point)
-		_curves[[start_point,end_point]] = curve
-		return curve
 
 
 func get_colors(start := 0, end := 0) -> Array:
@@ -149,11 +147,32 @@ func _get_curves(start := 0, end := 0) -> Array:
 	var curves := []
 	var point_nodes = get_point_nodes(start, end)
 	for i in range(0, point_nodes.size() - 1):
-		curves.append(get_curve(point_nodes[i], point_nodes[i+1]))
+		curves.append(_get_curve(point_nodes[i], point_nodes[i+1]))
 	return curves
 
 
-func _get_curve(start_point :Node, end_point :Node) -> Curve2D:
+func _get_curve(start_point :Node, end_point :Node):
+	if _curves.has([start_point,end_point]):
+		return _curves[[start_point,end_point]]
+	else:
+		var curve = _get_new_curve(start_point, end_point)
+		_curves[[start_point,end_point]] = curve
+		return curve
+
+
+func _is_straight(start_point :Node, end_point :Node) -> bool:
+	return (
+			start_point.get_handle_out(self) == Vector2.ZERO
+			and
+			end_point.get_handle_in(self) == Vector2.ZERO
+	);
+
+
+func _get_new_curve(start_point :Node, end_point :Node):
+	if _is_straight(start_point, end_point):
+		return [
+				start_point.get_position_in(self),
+				end_point.get_position_in(self)]
 	var curve := Curve2D.new()
 	curve.bake_interval = bake_interval
 	curve.add_point(
