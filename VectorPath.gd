@@ -20,7 +20,7 @@ var _curves := {}
 
 func _process(_delta) -> void:
 	if get_shape_has_changed():
-		_curves = {}
+		_expire_changed_curves()
 		emit_signal("shape_changed")
 		set_shape_has_changed(false)
 		update()
@@ -165,3 +165,14 @@ func _get_curve(start_point :Node, end_point :Node) -> Curve2D:
 			end_point.get_handle_in(self),
 			end_point.get_handle_out(self))
 	return curve
+
+
+func _expire_changed_curves() -> void:
+	for key in _curves.keys():
+		if (
+				key[0].get_has_changed() or key[0].get_handle_out_has_changed()
+				or
+				key[1].get_has_changed() or key[1].get_handle_in_has_changed()
+		):
+			# warning-ignore:return_value_discarded
+			_curves.erase(key)
