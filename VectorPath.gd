@@ -12,6 +12,8 @@ signal stroke_data_changed
 
 var is_vector_path = true
 export(float) var bake_interval = 10.0
+export(Color) var color_handle_in := Color.red setget set_color_handle_in
+export(Color) var color_handle_out := Color.green setget set_color_handle_out
 var _cached_bake_interval := 10.0
 var _curves := {}
 
@@ -21,9 +23,29 @@ func _process(_delta) -> void:
 		_curves = {}
 		emit_signal("shape_changed")
 		set_shape_has_changed(false)
+		update()
 	if get_stroke_data_has_changed():
 		emit_signal("stroke_data_changed")
 		set_stroke_data_has_changed(false)
+
+
+func _draw() -> void:
+	for point in get_point_nodes():
+		var start := to_global(point.get_position_in(self))
+		var end := to_global(point.get_position_in(self) + point.get_handle_in(self))
+		draw_line(start, end, color_handle_in)
+		end = to_global(point.get_position_in(self) + point.get_handle_out(self))
+		draw_line(start, end, color_handle_out)
+
+
+func set_color_handle_in(new_color :Color) -> void:
+	color_handle_in = new_color
+	update()
+
+
+func set_color_handle_out(new_color :Color) -> void:
+	color_handle_out = new_color
+	update()
 
 
 func get_shape(start := 0, end := 0) -> Array:
