@@ -42,6 +42,36 @@ func get_shape_has_changed() -> bool:
 	return false
 
 
+func get_handle_in_has_changed() -> bool:
+	if _cached_transform == null:
+		return true
+	var handles := get_handles()
+	match handles_type:
+		HandlesType.NONE, HandlesType.OUT:
+			return false
+		_:
+			if handles.size() == 0:
+				return false
+			return handles[0].get_has_changed()
+
+
+func get_handle_out_has_changed() -> bool:
+	if _cached_transform == null:
+		return true
+	var handles := get_handles()
+	match handles_type:
+		HandlesType.NONE, HandlesType.IN:
+			return false
+		HandlesType.BOTH:
+			if handles.size() < 2:
+				return false
+			return handles[1].get_has_changed()
+		_:
+			if handles.size() == 0:
+				return false
+			return handles[0].get_has_changed()
+
+
 func set_shape_has_changed(new_value: bool) -> void:
 	.set_has_changed(new_value)
 	for handle in get_handles():
