@@ -86,6 +86,7 @@ func get_handle_out(base_node: Node2D) -> Vector2:
 
 func set_handles_type(new_type: int) -> void:
 	handles_type = new_type
+	set_has_changed(true)
 	update_configuration_warning()
 
 
