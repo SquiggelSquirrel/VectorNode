@@ -7,9 +7,11 @@ enum HandlesType {NONE, IN, OUT, BOTH, MIRROR_IN, MIRROR_OUT, IN_OUT}
 export(HandlesType) var handles_type = HandlesType.BOTH setget set_handles_type
 export(float, 0.0, 1.0) var stroke_width := 1.0
 export(Color) var stroke_color
+export(float, 0.0, 100.0) var bake_interval := 0.0
 var is_control_point := true
-var _cached_stroke_width
+var _cached_stroke_width = 1.0
 var _cached_stroke_color
+var _cached_bake_interval = 0.0
 
 
 func _get_configuration_warning() -> String:
@@ -33,8 +35,16 @@ func _get_configuration_warning() -> String:
 	return ""
 
 
-func get_shape_has_changed() -> bool:
+func get_has_changed() -> bool:
+	if _cached_bake_interval != bake_interval:
+		return true
 	if .get_has_changed():
+		return true
+	return false
+
+
+func get_shape_has_changed() -> bool:
+	if get_has_changed():
 		return true
 	for handle in get_handles():
 		if handle.get_has_changed():
@@ -73,6 +83,10 @@ func get_handle_out_has_changed() -> bool:
 
 
 func set_shape_has_changed(new_value: bool) -> void:
+	if new_value:
+		_cached_bake_interval = null
+	else:
+		_cached_bake_interval = bake_interval
 	.set_has_changed(new_value)
 	for handle in get_handles():
 		handle.set_has_changed(new_value)

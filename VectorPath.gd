@@ -11,11 +11,11 @@ signal shape_changed
 signal stroke_data_changed
 
 var is_vector_path = true
-export(float) var bake_interval = 10.0
+export(float, 1.0, 100.0) var bake_interval = 10.0
 export(Color) var color_handle_in := Color.red setget set_color_handle_in
 export(Color) var color_handle_out := Color.green setget set_color_handle_out
-var _cached_bake_interval := 10.0
 var _curves := {}
+var _cached_bake_interval = 10.0
 
 
 func _process(_delta) -> void:
@@ -107,7 +107,7 @@ func get_stroke_data_has_changed() -> bool:
 
 func set_shape_has_changed(new_value: bool) -> void:
 	if new_value:
-		_cached_bake_interval = 0.0
+		_cached_bake_interval = null
 	else:
 		_cached_bake_interval = bake_interval
 	for point in get_point_nodes():
@@ -174,7 +174,10 @@ func _get_new_curve(start_point :Node, end_point :Node):
 				start_point.get_position_in(self),
 				end_point.get_position_in(self)]
 	var curve := Curve2D.new()
-	curve.bake_interval = bake_interval
+	if start_point.bake_interval == 0.0:
+		curve.bake_interval = bake_interval
+	else:
+		curve.bake_interval = start_point.bake_interval
 	curve.add_point(
 			start_point.get_position_in(self),
 			start_point.get_handle_in(self),
@@ -187,11 +190,14 @@ func _get_new_curve(start_point :Node, end_point :Node):
 
 
 func _expire_changed_curves() -> void:
+	var bake_interval_has_changed = _cached_bake_interval != bake_interval
 	for key in _curves.keys():
 		if (
 				key[0].get_has_changed() or key[0].get_handle_out_has_changed()
 				or
 				key[1].get_has_changed() or key[1].get_handle_in_has_changed()
+				or
+				(key[0].bake_interval < 1.0 and bake_interval_has_changed)
 		):
 			# warning-ignore:return_value_discarded
 			_curves.erase(key)
