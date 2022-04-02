@@ -8,6 +8,7 @@ export(int) var start = 0 setget set_start
 export(int) var end = 0 setget set_end
 export(bool) var use_data_nodes_width = false setget set_use_data_nodes_width
 export(bool) var use_data_nodes_color = false setget set_use_data_nodes_color
+export(bool) var use_close_fix = false setget set_use_close_fix
 var is_vector_stroke := true
 var _needs_shape_update := false
 var _needs_data_update := false
@@ -66,6 +67,11 @@ func set_use_data_nodes_color(new_use_data_nodes_color: bool) -> void:
 	use_data_nodes_color = new_use_data_nodes_color
 	if new_use_data_nodes_color:
 		_needs_data_update = true
+
+
+func set_use_close_fix(new_use_close_fix :bool) -> void:
+	use_close_fix = new_use_close_fix
+	_needs_shape_update = true
 
 
 func update_shape() -> void:
@@ -141,11 +147,12 @@ func _update_width(data_node :Node) -> void:
 
 func _close() -> void:
 	# Godot doesn't currently support closed Line2D nodes;
-	# create a closed-like effect with an extra point *almost* overlapping
-	# the start node, along the same line.
-	var start_vector := (points[1] - points[0]).normalized()
-	var close_point := points[0] + start_vector * -0.1
+	# create a closed-like effect with an extra point overlapping
+	# the start line
 	var _points = points
-	_points.append(close_point)
 	_points.append(points[0])
+	if use_close_fix:
+		var start_vector := (points[1] - points[0]).normalized()
+		var close_point := points[0] + start_vector * 0.1
+		_points.append(close_point)
 	points = _points
