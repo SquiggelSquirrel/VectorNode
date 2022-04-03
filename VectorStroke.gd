@@ -9,6 +9,8 @@ export(float) var end := 0.0 setget set_end
 export(bool) var use_data_nodes_width = false setget set_use_data_nodes_width
 export(bool) var use_data_nodes_color = false setget set_use_data_nodes_color
 export(bool) var use_close_fix = false setget set_use_close_fix
+export(float, 1.0) var start_pinch_length := 0.0 setget set_start_pinch_length
+export(float, 1.0) var end_pinch_length := 0.0 setget set_end_pinch_length
 var is_vector_stroke := true
 var _needs_shape_update := false
 var _needs_data_update := false
@@ -54,6 +56,16 @@ func set_start(new_start :float) -> void:
 func set_end(new_end :float) -> void:
 	end = new_end
 	_needs_shape_update = true
+	_needs_data_update = true
+
+
+func set_start_pinch_length(length :float) -> void:
+	start_pinch_length = length
+	_needs_data_update = true
+
+
+func set_end_pinch_length(length :float) -> void:
+	end_pinch_length = length
 	_needs_data_update = true
 
 
@@ -170,6 +182,31 @@ func _update_width(data_node :Node) -> void:
 		
 		# warning-ignore:return_value_discarded
 		width_curve.add_point(Vector2(_segment_ratios[i],width))
+	
+	if start_pinch_length > 0.0:
+		var width := width_curve.interpolate(start_pinch_length)
+		for i in width_curve.get_point_count():
+			for j in width_curve.get_point_count():
+				if width_curve.get_point_position(j)[0] <= start_pinch_length:
+					width_curve.remove_point(j)
+					break
+		# warning-ignore:return_value_discarded
+		width_curve.add_point(Vector2.ZERO)
+		# warning-ignore:return_value_discarded
+		width_curve.add_point(Vector2(start_pinch_length,width))
+	
+	if end_pinch_length > 0.0:
+		var end_pinch := 1.0 - end_pinch_length
+		var width := width_curve.interpolate(end_pinch)
+		for i in width_curve.get_point_count():
+			for j in width_curve.get_point_count():
+				if width_curve.get_point_position(j)[0] >= end_pinch:
+					width_curve.remove_point(j)
+					break
+		# warning-ignore:return_value_discarded
+		width_curve.add_point(Vector2.RIGHT)
+		# warning-ignore:return_value_discarded
+		width_curve.add_point(Vector2(end_pinch, width))
 
 
 func _close() -> void:
