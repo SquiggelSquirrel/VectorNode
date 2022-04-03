@@ -16,6 +16,7 @@ export(Color) var color_handle_in := Color.red setget set_color_handle_in
 export(Color) var color_handle_out := Color.green setget set_color_handle_out
 var _curves := {}
 var _cached_bake_interval = 10.0
+var logging = false
 
 
 func _process(_delta) -> void:
@@ -48,20 +49,66 @@ func set_color_handle_out(new_color :Color) -> void:
 	update()
 
 
-func get_shape(start := 0, end := 0) -> Array:
+func get_shape(start := 0.0, end := 0.0) -> Array:
 	var shape :=  []
-	var curves = _get_curves(start, end)
+	logging = true
+	var curves := _get_curves(start, end)
+	logging = false
+	var start_fraction := fposmod(start, 1.0)
+	var end_fraction := fposmod(end, 1.0)
 	var last_point
-	for curve in curves:
+	
+	for i in curves.size():
+		var curve = curves[i]
 		if curve is Curve2D:
-			var baked_points = Array(curve.get_baked_points())
-			shape += baked_points.slice(0,-2)
+			var baked_points := Array(curves[i].get_baked_points())
+			var first := 0
+			var last := -2
+			var prepend_point
 			last_point = baked_points[-1]
+			
+			if i == 0 and start_fraction > 0.0:
+				var f := start_fraction * (baked_points.size() -1)
+				var before := int(f)
+				first = before + 1
+				prepend_point = lerp(
+						baked_points[before],
+						baked_points[first],
+						f - before)
+			
+			if i + 1 == curves.size() and end_fraction > 0.0:
+				var f := end_fraction * (baked_points.size() -1)
+				last = int(f)
+				if ! range_is_closed(start, end):
+					last_point = lerp(
+							baked_points[last],
+							baked_points[last + 1],
+							f - last)
+			
+			if prepend_point:
+				shape.append(prepend_point)
+			shape += baked_points.slice(first, last)
+		
 		else:
-			shape.append(curve[0])
-			last_point = curve[1]
-	if ! range_is_closed(start,end) and curves.size() > 0:
+			var start_point = curve[0]
+			var end_point = curve[1]
+			if i == 0 and start_fraction > 0.0:
+				start_point = lerp(
+						curve[0],
+						curve[1],
+						start_fraction)
+			if i + 1 == curves.size() and end_fraction > 0.0:
+				end_point = lerp(
+						curve[0],
+						curve[1],
+						end_fraction)
+				
+			shape.append(start_point)
+			last_point = end_point
+	
+	if ! range_is_closed(start, end) and curves.size() > 0:
 		shape.append(last_point)
+	
 	return shape
 
 
@@ -119,7 +166,7 @@ func set_stroke_data_has_changed(new_value: bool) -> void:
 		point.set_stroke_data_has_changed(new_value)
 
 
-func get_point_nodes(start := 0, end := 0) -> Array:
+func get_point_nodes(start := 0.0, end := 0.0) -> Array:
 	var points := []
 	for child in get_children():
 		if child.get("is_control_point"):
@@ -127,23 +174,33 @@ func get_point_nodes(start := 0, end := 0) -> Array:
 	return _get_array_range(points, start, end)
 
 
-func range_is_closed(start :int, end:int) -> bool:
-	var size := get_point_nodes().size()
-	return wrapi(start, 0, size) == wrapi(end, 0, size)
+func range_is_closed(start :float, end:float) -> bool:
+	var size := float(get_point_nodes().size())
+	return wrapf(start, 0.0, size) == wrapf(end, 0.0, size)
 
 
-func _get_array_range(array :Array, start :int, end:int) -> Array:
+func _get_array_range(array :Array, start :float, end:float) -> Array:
 	if array.size() == 0:
 		return array
-	start = wrapi(start, 0, array.size())
-	end = wrapi(end, start + 1, start + array.size() + 1)
+	var fsize = float(array.size())
+	
+	start = fposmod(start, fsize)
+	end = wrapf(end, start, start + fsize)
+	end = stepify(end, 0.001) # stepify to elimitate floating-point error
+	if end == start:
+		end += fsize
+		
+	var int_start := int(floor(start))
+	var int_end := int(ceil(end))
+	
 	var result := []
-	for i in range(start, end + 1):
+	for i in range(int_start, int_end + 1):
 		result.append(array[wrapi(i, 0, array.size())])
+	
 	return result
 
 
-func _get_curves(start := 0, end := 0) -> Array:
+func _get_curves(start := 0.0, end := 0.0) -> Array:
 	var curves := []
 	var point_nodes = get_point_nodes(start, end)
 	for i in range(0, point_nodes.size() - 1):

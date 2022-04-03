@@ -4,8 +4,8 @@ class_name VectorStroke
 # Line2D that provides a "stroke" for a VectorPath
 
 export(NodePath) var path_node_path setget set_path_node_path
-export(int) var start = 0 setget set_start
-export(int) var end = 0 setget set_end
+export(float) var start := 0.0 setget set_start
+export(float) var end := 0.0 setget set_end
 export(bool) var use_data_nodes_width = false setget set_use_data_nodes_width
 export(bool) var use_data_nodes_color = false setget set_use_data_nodes_color
 export(bool) var use_close_fix = false setget set_use_close_fix
@@ -45,13 +45,13 @@ func set_path_node_path(new_path :NodePath) -> void:
 		_needs_data_update = true
 
 
-func set_start(new_start :int) -> void:
+func set_start(new_start :float) -> void:
 	start = new_start
 	_needs_shape_update = true
 	_needs_data_update = true
 
 
-func set_end(new_end :int) -> void:
+func set_end(new_end :float) -> void:
 	end = new_end
 	_needs_shape_update = true
 	_needs_data_update = true
