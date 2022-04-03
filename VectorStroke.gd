@@ -4,8 +4,8 @@ class_name VectorStroke
 # Line2D that provides a "stroke" for a VectorPath
 
 export(NodePath) var path_node_path setget set_path_node_path
-export(int) var start = 0 setget set_start
-export(int) var end = 0 setget set_end
+export(float) var start := 0.0 setget set_start
+export(float) var end := 0.0 setget set_end
 export(bool) var use_data_nodes_width = false setget set_use_data_nodes_width
 export(bool) var use_data_nodes_color = false setget set_use_data_nodes_color
 export(bool) var use_close_fix = false setget set_use_close_fix
@@ -45,13 +45,13 @@ func set_path_node_path(new_path :NodePath) -> void:
 		_needs_data_update = true
 
 
-func set_start(new_start :int) -> void:
+func set_start(new_start :float) -> void:
 	start = new_start
 	_needs_shape_update = true
 	_needs_data_update = true
 
 
-func set_end(new_end :int) -> void:
+func set_end(new_end :float) -> void:
 	end = new_end
 	_needs_shape_update = true
 	_needs_data_update = true
@@ -121,9 +121,26 @@ func _update_color(data_node :Node) -> void:
 	var point_colors :Array = data_node.get_colors(start,end)
 	if _segment_ratios.size() != point_colors.size():
 		return
+	
+	var start_fraction := fposmod(start, 1.0)
+	var end_fraction := fposmod(end, 1.0)
+	
 	for i in point_colors.size():
 		offsets.append(_segment_ratios[i])
-		colors.append(point_colors[i])
+		
+		if i == 0 and start_fraction != 0.0:
+			colors.append(lerp(
+					point_colors[0],
+					point_colors[1],
+					start_fraction))
+		elif i + 1 == point_colors.size() and end_fraction != 0.0:
+			colors.append(lerp(
+					point_colors[i-1],
+					point_colors[i],
+					end_fraction))
+		else:
+			colors.append(point_colors[i])
+	
 	if ! gradient:
 		gradient = Gradient.new()
 	gradient.offsets = offsets
@@ -138,11 +155,21 @@ func _update_width(data_node :Node) -> void:
 		width_curve.clear_points()
 	else:
 		width_curve = Curve.new()
+	
+	var start_fraction := fposmod(start, 1.0)
+	var end_fraction := fposmod(end, 1.0)
+	
 	for i in widths.size():
+		var width
+		if i == 0 and start_fraction != 0.0:
+			width = lerp(widths[0], widths[1], start_fraction)
+		elif i + 1 == widths.size() and end_fraction != 0.0:
+			width = lerp(widths[i-1], widths[i], end_fraction)
+		else:
+			width = widths[i]
+		
 		# warning-ignore:return_value_discarded
-		width_curve.add_point(Vector2(
-				_segment_ratios[i],
-				widths[i]))
+		width_curve.add_point(Vector2(_segment_ratios[i],width))
 
 
 func _close() -> void:
