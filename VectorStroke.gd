@@ -180,6 +180,7 @@ func _update_width(data_node :Node) -> void:
 		else:
 			width = widths[i]
 		
+		# warning-ignore:return_value_discarded
 		width_curve.add_point(Vector2(_segment_ratios[i],width))
 	
 	if start_pinch_length > 0.0:
@@ -189,7 +190,9 @@ func _update_width(data_node :Node) -> void:
 				if width_curve.get_point_position(j)[0] <= start_pinch_length:
 					width_curve.remove_point(j)
 					break
+		# warning-ignore:return_value_discarded
 		width_curve.add_point(Vector2.ZERO)
+		# warning-ignore:return_value_discarded
 		width_curve.add_point(Vector2(start_pinch_length,width))
 	
 	if end_pinch_length > 0.0:
@@ -200,7 +203,9 @@ func _update_width(data_node :Node) -> void:
 				if width_curve.get_point_position(j)[0] >= end_pinch:
 					width_curve.remove_point(j)
 					break
+		# warning-ignore:return_value_discarded
 		width_curve.add_point(Vector2.RIGHT)
+		# warning-ignore:return_value_discarded
 		width_curve.add_point(Vector2(end_pinch, width))
 
 
