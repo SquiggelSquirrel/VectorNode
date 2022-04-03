@@ -121,9 +121,26 @@ func _update_color(data_node :Node) -> void:
 	var point_colors :Array = data_node.get_colors(start,end)
 	if _segment_ratios.size() != point_colors.size():
 		return
+	
+	var start_fraction := fposmod(start, 1.0)
+	var end_fraction := fposmod(end, 1.0)
+	
 	for i in point_colors.size():
 		offsets.append(_segment_ratios[i])
-		colors.append(point_colors[i])
+		
+		if i == 0 and start_fraction != 0.0:
+			colors.append(lerp(
+					point_colors[0],
+					point_colors[1],
+					start_fraction))
+		elif i + 1 == point_colors.size() and end_fraction != 0.0:
+			colors.append(lerp(
+					point_colors[i-1],
+					point_colors[i],
+					end_fraction))
+		else:
+			colors.append(point_colors[i])
+	
 	if ! gradient:
 		gradient = Gradient.new()
 	gradient.offsets = offsets
@@ -138,11 +155,21 @@ func _update_width(data_node :Node) -> void:
 		width_curve.clear_points()
 	else:
 		width_curve = Curve.new()
+	
+	var start_fraction := fposmod(start, 1.0)
+	var end_fraction := fposmod(end, 1.0)
+	
 	for i in widths.size():
+		var width
+		if i == 0 and start_fraction != 0.0:
+			width = lerp(widths[0], widths[1], start_fraction)
+		elif i + 1 == widths.size() and end_fraction != 0.0:
+			width = lerp(widths[i-1], widths[i], end_fraction)
+		else:
+			width = widths[i]
+		
 		# warning-ignore:return_value_discarded
-		width_curve.add_point(Vector2(
-				_segment_ratios[i],
-				widths[i]))
+		width_curve.add_point(Vector2(_segment_ratios[i],width))
 
 
 func _close() -> void:

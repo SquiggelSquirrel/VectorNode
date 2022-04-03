@@ -16,7 +16,6 @@ export(Color) var color_handle_in := Color.red setget set_color_handle_in
 export(Color) var color_handle_out := Color.green setget set_color_handle_out
 var _curves := {}
 var _cached_bake_interval = 10.0
-var logging = false
 
 
 func _process(_delta) -> void:
@@ -51,9 +50,7 @@ func set_color_handle_out(new_color :Color) -> void:
 
 func get_shape(start := 0.0, end := 0.0) -> Array:
 	var shape :=  []
-	logging = true
 	var curves := _get_curves(start, end)
-	logging = false
 	var start_fraction := fposmod(start, 1.0)
 	var end_fraction := fposmod(end, 1.0)
 	var last_point
@@ -112,24 +109,45 @@ func get_shape(start := 0.0, end := 0.0) -> Array:
 	return shape
 
 
-func get_baked_lengths(start := 0, end := 0) -> Array:
+func get_baked_lengths(start := 0.0, end := 0.0) -> Array:
 	var lengths := []
-	for curve in _get_curves(start, end):
+	var curves := _get_curves(start, end)
+	for i in curves.size():
+		var curve = curves[i]
+		
+		var length :float
 		if curve is Curve2D:
-			lengths.append(curve.get_baked_length())
+			length = curve.get_baked_length()
 		else:
-			lengths.append(curve[0].distance_to(curve[1]))
+			length = curve[0].distance_to(curve[1])
+		
+		var start_fraction := 0.0
+		if i == 0:
+			start_fraction = fposmod(start, 1.0)
+		var head_length := length * start_fraction
+		
+		var end_fraction := 1.0
+		if i + 1 == curves.size():
+			end_fraction = fposmod(end, 1.0)
+			end_fraction = stepify(end_fraction, 0.001)
+			if end_fraction == 0.0:
+				end_fraction = 1.0
+		var tail_length := length * (1.0 - end_fraction)
+		
+		length -= head_length + tail_length
+		lengths.append(length)
+		
 	return lengths
 
 
-func get_colors(start := 0, end := 0) -> Array:
+func get_colors(start := 0.0, end := 0.0) -> Array:
 	var colors := []
 	for node in get_point_nodes(start, end):
 		colors.append(node.stroke_color)
 	return colors
 
 
-func get_widths(start := 0, end := 0) -> Array:
+func get_widths(start := 0.0, end := 0.0) -> Array:
 	var widths := []
 	for node in get_point_nodes(start, end):
 		widths.append(node.stroke_width)
