@@ -14,6 +14,7 @@ var is_vector_path = true
 export(float, 1.0, 100.0) var bake_interval = 10.0
 export(Color) var color_handle_in := Color.red setget set_color_handle_in
 export(Color) var color_handle_out := Color.green setget set_color_handle_out
+export(Color) var color_path := Color.lightgray setget set_color_path
 var _curves := {}
 var _cached_bake_interval = 10.0
 
@@ -30,12 +31,18 @@ func _process(_delta) -> void:
 
 
 func _draw() -> void:
+	if ! Engine.editor_hint:
+		return
 	for point in get_point_nodes():
-		var start := to_global(point.get_position_in(self))
-		var end := to_global(point.get_position_in(self) + point.get_handle_in(self))
+		var start :Vector2 = point.get_position_in(self)
+		var end :Vector2 = point.get_position_in(self) + point.get_handle_in(self)
 		draw_line(start, end, color_handle_in)
-		end = to_global(point.get_position_in(self) + point.get_handle_out(self))
+		end = point.get_position_in(self) + point.get_handle_out(self)
 		draw_line(start, end, color_handle_out)
+	var points := get_shape()
+	if points.size() > 2:
+		points.append(points[0])
+		draw_polyline(points, color_path)
 
 
 func set_color_handle_in(new_color :Color) -> void:
@@ -45,6 +52,11 @@ func set_color_handle_in(new_color :Color) -> void:
 
 func set_color_handle_out(new_color :Color) -> void:
 	color_handle_out = new_color
+	update()
+
+
+func set_color_path(new_color :Color) -> void:
+	color_path = new_color
 	update()
 
 

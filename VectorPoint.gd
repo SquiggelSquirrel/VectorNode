@@ -143,7 +143,10 @@ func get_handles() -> Array:
 
 
 func _get_handle(base_node: Node2D, index: int) -> Vector2:
-	var handle := (get_handles()[index] as VectorHandle)
+	var handles := get_handles()
+	if index >= handles.size():
+		return Vector2.ZERO
+	var handle := (handles[index] as VectorHandle)
 	var handle_position := handle.get_position_in(base_node)
 	var own_position := get_position_in(base_node)
 	return handle_position - own_position
