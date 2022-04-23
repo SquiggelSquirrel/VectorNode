@@ -2,7 +2,7 @@ tool
 extends Object
 class_name SelfIntersect
 
-enum {LANDSCAPE, PORTRAIT}
+enum {LANDSCAPE, PORTRAIT, NONE, LEFT, RIGHT, OVERLAP}
 
 
 static func self_intersections(points :Array) -> Array:
@@ -10,14 +10,25 @@ static func self_intersections(points :Array) -> Array:
 		return []
 	var segments := find_segments(points)
 	var collisions := colliding_segments(points, segments)
+	collisions = filter_connection_collisions(collisions)
 	var intersections := []
+	var iterations := 0
 	while collisions.size() > 0:
+		iterations += 0
+		assert(iterations < 10)
 		var pair = collisions.pop_front()
 		var a := pair[0] as Segment
 		var b := pair[1] as Segment
 		if a.length == 1 and b.length == 1:
-			if intersects(a, b):
-				intersections.append(get_intersection(a, b))
+			if intersect_type(
+			[a.start_point(),a.end_point()],
+			[b.start_point(),b.end_point()]) != NONE:
+				var intersection := Intersection.new(
+						a.start, b.start,
+						get_intersection(
+								[a.start_point(), a.end_point()],
+								[b.start_point(), b.end_point()]))
+				intersections.append(intersection)
 		if a.length > b.length:
 			for segment in a.split():
 				if overlap(segment.box, b.box):
@@ -29,25 +40,26 @@ static func self_intersections(points :Array) -> Array:
 	return intersections
 
 
-static func intersects(a :Segment, b :Segment) -> bool:
-	if ! segment_crosses_line(a,b):
-		return false
-	if ! segment_crosses_line(b,a):
-		return false
-	return true
+static func intersect_type(a :Array, b :Array) -> int:
+	var a_across_b = segment_crosses_line(a,b)
+	if a_across_b == NONE:
+		return NONE
+	return segment_crosses_line(b,a)
 
 
-static func segment_crosses_line(segment :Segment, line :Segment) -> bool:
-	var compare_1 := point_line_compare(
-			segment.start_point(), line.start_point(), line.end_point())
-	if compare_1 == 0:
-		return false
-	var compare_2 := point_line_compare(
-			segment.end_point(), line.start_point(), line.end_point()
-	)
-	if compare_2 == 0 or compare_2 == compare_1:
-		return false
-	return true
+static func segment_crosses_line(segment :Array, line :Array) -> int:
+	var compare_start := point_line_compare(
+			segment[0], line[0], line[1])
+	var compare_end := point_line_compare(
+			segment[1], line[0], line[1])
+	
+	if compare_start == OVERLAP and compare_end == OVERLAP:
+		return OVERLAP
+	if compare_start == compare_end:
+		return NONE
+	if compare_start == RIGHT or compare_end == LEFT:
+		return LEFT
+	return RIGHT
 
 
 static func point_line_compare(
@@ -55,55 +67,78 @@ static func point_line_compare(
 ) -> int:
 	var offset_point := point - start
 	var offset_end := end - start
-	return compare(cross(offset_point, offset_end), 0)
+	match compare(cross(offset_point, offset_end), 0):
+		1: 
+			return RIGHT
+		-1:
+			return LEFT
+	return OVERLAP
 
 
 static func cross(a :Vector2, b :Vector2) -> float:
 	return a.x * b.y - b.x * a.y
 
 
-static func get_intersection(line_1 :Segment, line_2 :Segment) -> Intersection:
-	var point_a := line_1.start_point()
-	var point_b := line_1.end_point()
-	var point_c := line_2.start_point()
-	var point_d := line_2.end_point()
+static func get_intersection(line_1 :Array, line_2 :Array) -> Vector2:
+	var point_a := line_1[0] as Vector2
+	var point_b := line_1[1] as Vector2
+	var point_c := line_2[0] as Vector2
+	var point_d := line_2[1] as Vector2
 	
 	var x :float
 	var y :float
 	
 	if point_a.x == point_b.x:
+		if point_c.x == point_d.x:
+			return Vector2(NAN, NAN)
 		x = point_a.x
-		var p := (x - point_c.x) / point_d.x
-		y = lerp(point_c.y, point_d.y, p)
+		var slope_2 := (point_d.y - point_c.y) / (point_d.x - point_c.x)
+		var offset_2 := point_c.y - slope_2 * point_c.x
+		y = slope_2 * x + offset_2
+	
 	elif point_c.x == point_d.x:
 		x = point_c.x
-		var p := (x - point_a.x) / point_b.x
-		y = lerp(point_a.y, point_b.y, p)
+		var slope_1 := (point_b.y - point_a.y) / (point_b.x - point_a.x)
+		var offset_1 := point_a.y - slope_1 * point_a.x
+		y = slope_1 * x + offset_1
+	
 	else:
 		var slope_1 := (point_b.y - point_a.y) / (point_b.x - point_a.x)
 		var slope_2 := (point_d.y - point_c.y) / (point_d.x - point_c.x)
+		if slope_1 == slope_2:
+			return Vector2(NAN, NAN)
 		var offset_1 := point_a.y - slope_1 * point_a.x
 		var offset_2 := point_c.y - slope_2 * point_c.x
 		x = (offset_2 - offset_1) / (slope_1 - slope_2)
 		y = slope_1 * x + offset_1
 	
-	return Intersection.new(line_1.start, line_2.start, Vector2(x,y))
+	return Vector2(x,y)
 
 
 static func get_orientation(points :Array) -> int:
-	var min_x := -INF
-	var min_y := -INF
-	var max_x := INF
-	var max_y := INF
+	var min_x := INF
+	var min_y := INF
+	var max_x := -INF
+	var max_y := -INF
 	for point in points:
 		min_x = min(min_x, point.x)
 		min_y = min(min_y, point.y)
 		max_x = max(max_x, point.x)
 		max_y = max(max_y, point.y)
-	if max_y - min_y < max_x - min_x:
+	if abs(max_y - min_y) > abs(max_x - min_x):
 		return PORTRAIT
 	else:
 		return LANDSCAPE
+
+
+static func filter_connection_collisions(collisions :Array) -> Array:
+	var filtered := []
+	for collision in collisions:
+		if ! segments_overlap_at_connection_only(
+				collision[0], collision[1]
+		):
+			filtered.append(collision)
+	return filtered
 
 
 static func colliding_segments(points :Array, segments :Array) -> Array:
@@ -116,15 +151,13 @@ static func colliding_segments_landscape(segments :Array) -> Array:
 	var boundaries := []
 	for segment in segments:
 		boundaries.append(SegmentBoundary.new(
-				segment, segment.box.min_x, SegmentBoundary.START))
+				segment, segment.box[0].x, SegmentBoundary.START))
 		boundaries.append(SegmentBoundary.new(
-				segment, segment.box.max_x, SegmentBoundary.END))
+				segment, segment.box[1].x, SegmentBoundary.END))
 	boundaries.sort_custom(SegmentBoundary, "sort")
 	
-	var current_segments := []
 	var collisions := []
-	var forward_collisions := {}
-	var backward_collisions := {}
+	var current_segments := []
 	for boundary in boundaries:
 		var segment := (boundary as SegmentBoundary).segment
 		match boundary.type:
@@ -137,23 +170,25 @@ static func colliding_segments_landscape(segments :Array) -> Array:
 				current_segments.insert(i, segment)
 				if i > 0:
 					candidates.append(current_segments[i-i])
-					
-				while candidates.size() > 0:
-					var previous_segment = candidates.pop_front()
+				
+				for j in range(i + 1, current_segments.size()):
+					var previous_segment = current_segments[j]
 					if overlap(segment.box, previous_segment.box):
 						collisions.append([previous_segment, segment])
-						dict_append(
-								forward_collisions, previous_segment, segment)
-						dict_append(
-								backward_collisions, segment, previous_segment)
-						candidates += forward_collisions.get(
-								previous_segment, [])
+					else:
+						break
 				
+				for j in range(i - 1, -1, -1):
+					var previous_segment = current_segments[j]
+					if overlap(segment.box, previous_segment.box):
+						collisions.append([previous_segment, segment])
+					else:
+						break
+
 			SegmentBoundary.END:
 				var i := current_segments.bsearch_custom(
-						boundary.segment,
-						Segment,
-						"sort_y")
+						segment, Segment, "sort_y")
+				i = current_segments.find(segment, i)
 				current_segments.remove(i)
 	return collisions
 
@@ -168,15 +203,13 @@ static func colliding_segments_portrait(segments :Array) -> Array:
 	var boundaries := []
 	for segment in segments:
 		boundaries.append(SegmentBoundary.new(
-				segment, segment.box.min_y, SegmentBoundary.START))
+				segment, segment.box[0].y, SegmentBoundary.START))
 		boundaries.append(SegmentBoundary.new(
-				segment, segment.box.max_y, SegmentBoundary.END))
+				segment, segment.box[1].y, SegmentBoundary.END))
 	boundaries.sort_custom(SegmentBoundary, "sort")
 	
-	var current_segments := []
 	var collisions := []
-	var forward_collisions := {}
-	var backward_collisions := {}
+	var current_segments := []
 	for boundary in boundaries:
 		var segment := (boundary as SegmentBoundary).segment
 		match boundary.type:
@@ -189,32 +222,73 @@ static func colliding_segments_portrait(segments :Array) -> Array:
 				current_segments.insert(i, segment)
 				if i > 0:
 					candidates.append(current_segments[i-i])
-					
-				while candidates.size() > 0:
-					var previous_segment = candidates.pop_front()
+				
+				for j in range(i + 1, current_segments.size()):
+					var previous_segment = current_segments[j]
 					if overlap(segment.box, previous_segment.box):
 						collisions.append([previous_segment, segment])
-						dict_append(
-								forward_collisions, previous_segment, segment)
-						dict_append(
-								backward_collisions, segment, previous_segment)
-						candidates += forward_collisions.get(
-								previous_segment, [])
+					else:
+						break
 				
+				for j in range(i - 1, -1, -1):
+					var previous_segment = current_segments[j]
+					if overlap(segment.box, previous_segment.box):
+						collisions.append([previous_segment, segment])
+					else:
+						break
+
 			SegmentBoundary.END:
 				var i := current_segments.bsearch_custom(
 						boundary.segment,
 						Segment,
 						"sort_x")
+				i = current_segments.find(segment, i)
 				current_segments.remove(i)
 	return collisions
 
 
-static func overlap(box_a :Box, box_b :Box) -> bool:
-	return (box_a.min_x < box_b.max_x
-			and box_a.min_y < box_b.max_y
-			and box_a.max_x > box_b.min_x
-			and box_a.max_y > box_b.min_y)
+static func overlap(box_a :Array, box_b :Array) -> bool:
+	return (box_a[0].x <= box_b[1].x
+			and box_a[0].y <= box_b[1].y
+			and box_a[1].x >= box_b[0].x
+			and box_a[1].y >= box_b[0].y)
+
+
+static func segments_overlap_at_connection_only(
+	segment_a :Segment, segment_b :Segment
+) -> bool:
+	var points := segment_a._points
+	if segment_b._points != points:
+		return false
+	
+	var first :Segment
+	var second :Segment
+	if segment_a.start == segment_b.end:
+		first = segment_b
+		second = segment_a
+	elif segment_a.end == segment_b.start:
+		first = segment_a
+		second = segment_b
+	else:
+		return false
+	
+	var overlap_x = (segment_a.box[0].x < segment_b.box[1].x
+			and segment_a.box[1].x > segment_b.box[0].x)
+	var overlap_y = (segment_a.box[0].y < segment_b.box[1].y
+			and segment_a.box[1].y > segment_b.box[0].y)
+	if overlap_x and overlap_y:
+		return false
+	
+	if overlap_x:
+		if points[first.end - 1].y == points[second.start + 1].y:
+			return false
+		return true
+	elif overlap_y:
+		if points[first.end - 1].x == points[second.start + 1].x:
+			return false
+		return true
+	else:
+		return true
 
 
 static func find_segments(points :Array) -> Array:
@@ -237,7 +311,7 @@ static func find_segments(points :Array) -> Array:
 		segments.append(Segment.new(
 				points,
 				breaks[i],
-				breaks[wrapi(i,0,breaks.size())]
+				breaks[wrapi(i+1,0,breaks.size())]
 		))
 	return segments
 
@@ -290,12 +364,15 @@ class SegmentBoundary:
 	
 	
 	static func sort(a :SegmentBoundary, b :SegmentBoundary) -> bool:
+		if a.value == b.value:
+			if a.type == START and b.type == END:
+				return true
 		return a.value < b.value
 
 
 class Segment:
 	var _points :Array
-	var box :Box
+	var box :Array
 	var start :int
 	var end :int
 	var length :int
@@ -305,7 +382,11 @@ class Segment:
 		start = from
 		end = to
 		_points = points
-		box = Box.new(points[from],points[to])
+		box = [
+			Vector2(min(points[from].x, points[to].x),
+					min(points[from].y, points[to].y)),
+			Vector2(max(points[from].x, points[to].x),
+					max(points[from].y, points[to].y))]
 		length = to - from
 	
 	
@@ -324,26 +405,12 @@ class Segment:
 				Segment.new(_points, start + split_length, end)]
 	
 	
-	func sort_x(a :Segment, b :Segment) -> bool:
-		return a.box.min_x < b.box.min_x
+	static func sort_x(a :Segment, b :Segment) -> bool:
+		return a.box[0].x < b.box[0].x
 	
 	
-	func sort_y(a :Segment, b :Segment) -> bool:
-		return a.box.min_x < b.box.min_x
-
-
-class Box:
-	var min_x :float
-	var min_y :float
-	var max_x :float
-	var max_y :float
-	
-	
-	func _init(corner_a :Vector2, corner_b :Vector2) -> void:
-		min_x = min(corner_a.x, corner_b.x)
-		min_y = min(corner_a.y, corner_b.y)
-		max_x = max(corner_a.x, corner_b.x)
-		max_y = max(corner_a.y, corner_b.y)
+	static func sort_y(a :Segment, b :Segment) -> bool:
+		return a.box[0].y < b.box[0].y
 
 
 class Intersection:
