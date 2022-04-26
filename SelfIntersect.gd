@@ -18,6 +18,13 @@ static func get_self_intersections(points :Array) -> Array:
 		var type := get_intersect_type(segment_a, segment_b)
 		if type == NONE:
 			continue
+		var connecting := bool(
+			segments[0][0] == segments[1][1]
+			or
+			segments[0][1] == segments[1][0]
+		)
+		if connecting and type != OVERLAP:
+			continue
 		intersections.append({
 			'segment_a': segments[0][0],
 			'segment_b': segments[1][0],
@@ -31,7 +38,7 @@ static func get_overlapping_segments(
 		points :Array, overlapping_sections :Array
 ) -> Array:
 	var overlapping_segments := []
-	var limit := points.size()
+	var limit := points.size() * points.size()
 	while overlapping_sections.size() > 0:
 		limit -= 1
 		assert(limit > 0)
@@ -209,24 +216,20 @@ static func filter_connection_overlaps(points :Array, overlaps :Array) -> Array:
 
 
 static func overlapping_sections(points :Array, sections :Array) -> Array:
-	if get_path_orientation(points) == LANDSCAPE:
-		return overlapping_sections_landscape(points, sections)
-	return overlapping_sections_portrait(points, sections)
-
-
-static func overlapping_sections_landscape(
-		points :Array, sections :Array
-) -> Array:
+	var orientation = get_path_orientation(points)
+	
 	var boundaries := []
+	var boundary_axis = {
+		PORTRAIT: 'y',
+		LANDSCAPE: 'x'
+	}[orientation]
 	for section in sections:
 		var box := bounding_box(points[section[0]], points[section[1]])
 		boundaries.append(SectionBoundary.new(
-				section, box[0].x, SectionBoundary.START))
+				section, box[0][boundary_axis], SectionBoundary.START))
 		boundaries.append(SectionBoundary.new(
-				section, box[1].x, SectionBoundary.END))
+				section, box[1][boundary_axis], SectionBoundary.END))
 	boundaries.sort_custom(SectionBoundary, "sort")
-	
-	var section_sort = SectionSort.new(points)
 	
 	var overlaps := []
 	var current_sections := []
@@ -234,85 +237,14 @@ static func overlapping_sections_landscape(
 		var section := (boundary as SectionBoundary).section
 		match boundary.type:
 			SectionBoundary.START:
-				var i := current_sections.bsearch_custom(
-						section, section_sort, "sort_y")
-				var candidates := []
-				if i < current_sections.size():
-					candidates.append(current_sections[i])
-				current_sections.insert(i, section)
-				if i > 0:
-					candidates.append(current_sections[i-i])
+				for other_section in current_sections:
+					if sections_overlap(points, section, other_section):
+						overlaps.append([other_section, section])
 				
-				for j in range(i + 1, current_sections.size()):
-					var previous_section = current_sections[j]
-					if sections_overlap(points, section, previous_section):
-						overlaps.append([previous_section, section])
-					else:
-						break
-				
-				for j in range(i - 1, -1, -1):
-					var previous_section = current_sections[j]
-					if sections_overlap(points, section, previous_section):
-						overlaps.append([previous_section, section])
-					else:
-						break
+				current_sections.append(section)
 
 			SectionBoundary.END:
-				var i := current_sections.bsearch_custom(
-						section, section_sort, "sort_y")
-				i = current_sections.find(section, i)
-				current_sections.remove(i)
-	return overlaps
-
-
-static func overlapping_sections_portrait(
-		points :Array, sections :Array
-) -> Array:
-	var boundaries := []
-	for section in sections:
-		var box := bounding_box(points[section[0]], points[section[1]])
-		boundaries.append(SectionBoundary.new(
-				section, box[0].y, SectionBoundary.START))
-		boundaries.append(SectionBoundary.new(
-				section, box[1].y, SectionBoundary.END))
-	boundaries.sort_custom(SectionBoundary, "sort")
-	
-	var section_sort = SectionSort.new(points)
-	
-	var overlaps := []
-	var current_sections := []
-	for boundary in boundaries:
-		var section := (boundary as SectionBoundary).section
-		match boundary.type:
-			SectionBoundary.START:
-				var i := current_sections.bsearch_custom(
-						section, section_sort, "sort_x")
-				var candidates := []
-				if i < current_sections.size():
-					candidates.append(current_sections[i])
-				current_sections.insert(i, section)
-				if i > 0:
-					candidates.append(current_sections[i-i])
-				
-				for j in range(i + 1, current_sections.size()):
-					var previous_section = current_sections[j]
-					if sections_overlap(points, section, previous_section):
-						overlaps.append([previous_section, section])
-					else:
-						break
-				
-				for j in range(i - 1, -1, -1):
-					var previous_section = current_sections[j]
-					if sections_overlap(points, section, previous_section):
-						overlaps.append([previous_section, section])
-					else:
-						break
-
-			SectionBoundary.END:
-				var i := current_sections.bsearch_custom(
-						section, section_sort, "sort_x")
-				i = current_sections.find(section, i)
-				current_sections.remove(i)
+				current_sections.erase(section)
 	return overlaps
 
 
@@ -441,22 +373,6 @@ static func bounding_box(point_a :Vector2, point_b :Vector2) -> Array:
 	return [
 			Vector2(min(point_a.x, point_b.x), min(point_a.y, point_b.y)),
 			Vector2(max(point_a.x, point_b.x), max(point_a.y, point_b.y))]
-
-
-class SectionSort:
-	var _points :Array
-	
-	
-	func _init(points :Array) -> void:
-		_points = points
-	
-	
-	func sort_x(section_a :Array, section_b :Array) -> bool:
-		return _points[section_a[0]].x < _points[section_b[0]].x
-	
-	
-	func sort_y(section_a :Array, section_b :Array) -> bool:
-		return _points[section_a[0]].y < _points[section_b[0]].y
 
 
 class SectionBoundary:
