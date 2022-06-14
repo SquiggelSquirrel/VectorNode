@@ -11,8 +11,26 @@ static func get_self_intersections(points :Array) -> Array:
 	var sections := find_directed_sections(points)
 	var overlaps := overlapping_sections(points, sections)
 	overlaps = filter_connection_overlaps(points, overlaps)
+	var segments = get_overlapping_segments(points, overlaps)
+	var intersections = get_intersecting_segments(points, segments)
+	return intersections
+
+
+static func merge_intersections(intersections :Array) -> Array:
+	var merged_intersections := intersections
+	merged_intersections.sort_custom(SelfIntersect, 'sort_segments_a')
+	for i in intersections.size():
+		var intersection = intersections[i]
+	return merged_intersections
+
+
+static func sort_segments_a(a :Dictionary, b :Dictionary) -> bool:
+	return a.segments_a[0] < b.segments_a[0];
+
+
+static func get_intersecting_segments(points :Array, overlapping_segments :Array) -> Array:
 	var intersections := []
-	for segments in get_overlapping_segments(points, overlaps):
+	for segments in overlapping_segments:
 		var segment_a := [points[segments[0][0]], points[segments[0][1]]]
 		var segment_b := [points[segments[1][0]], points[segments[1][1]]]
 		var type := get_intersect_type(segment_a, segment_b)
@@ -26,8 +44,8 @@ static func get_self_intersections(points :Array) -> Array:
 		if connecting and type != OVERLAP:
 			continue
 		intersections.append({
-			'segment_a': segments[0][0],
-			'segment_b': segments[1][0],
+			'segments_a': [segments[0][0]],
+			'segments_b': [segments[1][0]],
 			'type': type,
 			'points': get_line_intersection(segment_a, segment_b)
 		})
