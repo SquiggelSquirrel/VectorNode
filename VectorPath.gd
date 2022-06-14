@@ -99,6 +99,7 @@ func get_shape(start := 0.0, end := 0.0) -> Array:
 			shape += baked_points.slice(first, last)
 		
 		else:
+			# Straight line
 			var start_point = curve[0]
 			var end_point = curve[1]
 			if i == 0 and start_fraction > 0.0:
@@ -201,6 +202,8 @@ func get_point_nodes(start := 0.0, end := 0.0) -> Array:
 	for child in get_children():
 		if child.get("is_control_point"):
 			points.append(child)
+		if child.get("is_control_point_group"):
+			points += child.get_point_nodes();
 	return _get_array_range(points, start, end)
 
 
