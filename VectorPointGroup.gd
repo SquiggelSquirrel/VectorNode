@@ -1,12 +1,10 @@
 tool
 extends Node2D
-class_name VectorControl
-# Abstract class for code shared by VectorPoint and VectorHandle
-# Tracks whether or not transform has changed,
-# since has_changed was last set to false
+class_name VectorPointGroup
 
-export(int, FLAGS, "") var tags := 1
+var is_control_point_group := true
 var has_changed :bool setget set_has_changed, get_has_changed
+
 onready var _cached_transform = null
 
 
@@ -24,12 +22,14 @@ func set_has_changed(new_value: bool) -> void:
 		_cached_transform = transform
 
 
-func get_position_in(reference_node: Node2D) -> Vector2:
-	return reference_node.to_local(global_position)
-
-
-func matches_mask(mask :int) -> bool:
-	return bool(tags & mask)
+func get_point_nodes(mask :int = 1) -> Array:
+	var points := []
+	for child in get_children():
+		if child.get("is_control_point") and child.matches_mask(mask):
+			points.append(child)
+		if child.get("is_control_point_group"):
+			points += child.get_point_nodes(mask);
+	return points
 
 
 func _get_layer_names(property_name :String) -> Array:

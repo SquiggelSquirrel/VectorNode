@@ -1,6 +1,8 @@
 # VectorNode
 Create shapes with fill/stroke from Node2D control points
 
+Note: As of 1.7.0 I recommend using with the Bit Flags Editor plugin: https://github.com/SquiggelSquirrel/BitFlagEditor
+
 ## VectorPath
 - Defines the path to fill/stroke
 - Add VectorPoint nodes for each point on the path
@@ -9,10 +11,11 @@ Create shapes with fill/stroke from Node2D control points
 - Sets the default bake interval for the shape
 - Has editor-preview-only color settings for handle-in, handle-out and path
 - Uses VectorPoint to define stroke widths & colors, and specific bake intervals
+- Can define an array of tag name strings (only for editor UI purposes), for use with VectorPoint "tags" bitmask
 
 ## VectorPoint
 - Defines a single point in a vector path
-- Use as child of VectorPath
+- Use as child of VectorPath or VectorPointGroup
 - Add VectorHandle nodes to define the vector in/out
 - Can specify a stroke width and/or color
   - (will only apply to VectorStroke nodes with `use_data_nodes_width` or `use_data_nodes_color` set
@@ -27,18 +30,26 @@ Create shapes with fill/stroke from Node2D control points
   - MIRROR OUT: one handle, defines vector out. Vector in is reflection of vector out
   - IN OUT: one handle, defines vector in and vector out as same vector
 - Points and handles use position relative to VectorPath, so rotating/scaling a VectorPoint can change the handle position
+- Has an integer bitmask of tags, which can be used by fill and stroke to filter for different sub-paths
 
 ## VectorHandle
 - Defines vector in/out for a VectorPoint (see above)
+- Has an integer bitmask of tags, which can be used by fill and stroke to filter for different sub-paths
 
 ## VectorControl
 - Abstract class defining shared behaviour of VectorPoint and VectorHandle
+
+## VectorPointGroup
+- Use as child of VectorPath or another VectorPointGroup
+- Usually contains one or more VectorPoints and/or other VectorPointGroups
+- Allows one or more VectorPoints to be moved, rotated, and/or scaled together
 
 ## VectorFill
 - Fills a VectorPath
 - Set `path_node_path` to the NodePath of the VectorPath
 - Call `update_fill` to update
 - Commonly you would connect the VectorPath `shape_changed` signal to the `update_fill` method
+- Has an integer mask (normally I would only set one bit) to specify which VectorControls to use
 
 ## VectorStroke
 - Strokes a VectorPath
@@ -56,8 +67,10 @@ Create shapes with fill/stroke from Node2D control points
   a small overlap when the stroke is closed
 - Commonly you would connect the VectorPath `shape_changed` signal to the `update_shape` method
 - If using width/color, connect `stroke_data_changed` to `update_data` for automatic updates
+- Has an integer mask (normally I would only set one bit) to specify which VectorControls to use
 
 ## VectorCollisionPolygon
 - Creates a collision polygon from a VectorPath
+- Almost identical to VectorFill
 - Call `upadate_polygon` to update
 - Connect `shape_changed` to `update_polygon` for automatic updates
