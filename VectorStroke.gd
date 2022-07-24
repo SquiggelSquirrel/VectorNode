@@ -4,6 +4,7 @@ class_name VectorStroke
 # Line2D that provides a "stroke" for a VectorPath
 
 export(NodePath) var path_node_path setget set_path_node_path
+export(int, FLAGS, "") var mask := 1
 export(float) var start := 0.0 setget set_start
 export(float) var end := 0.0 setget set_end
 export(bool) var use_data_nodes_width = false setget set_use_data_nodes_width
@@ -11,10 +12,13 @@ export(bool) var use_data_nodes_color = false setget set_use_data_nodes_color
 export(bool) var use_close_fix = false setget set_use_close_fix
 export(float, 1.0) var start_pinch_length := 0.0 setget set_start_pinch_length
 export(float, 1.0) var end_pinch_length := 0.0 setget set_end_pinch_length
+
 var is_vector_stroke := true
+
 var _needs_shape_update := false
 var _needs_data_update := false
 var _segment_ratios := []
+
 onready var _is_ready = true
 
 
@@ -90,7 +94,7 @@ func update_shape() -> void:
 	var path_node = _get_path_node()
 	if ! path_node:
 		return
-	points = path_node.get_shape(start,end)
+	points = path_node.get_shape(start,end,mask)
 	if path_node.range_is_closed(start,end):
 		_close()
 	_needs_shape_update = false
@@ -100,11 +104,11 @@ func update_data() -> void:
 	var path_node = _get_path_node()
 	if ! path_node:
 		return
-	_update_segment_ratios(path_node)
+	_update_segment_ratios(path_node, mask)
 	if use_data_nodes_color:
-		_update_color(path_node)
+		_update_color(path_node, mask)
 	if use_data_nodes_width:
-		_update_width(path_node)
+		_update_width(path_node, mask)
 	_needs_data_update = false
 
 
@@ -116,10 +120,10 @@ func _get_path_node():
 	return null
 
 
-func _update_segment_ratios(path_node :Node) -> void:
+func _update_segment_ratios(path_node :Node, mask :int = 1) -> void:
 	var length_offsets := [0.0]
 	var total_length := 0.0
-	for length in path_node.get_baked_lengths(start, end):
+	for length in path_node.get_baked_lengths(start, end, mask):
 		total_length += length
 		length_offsets.append(total_length)
 	_segment_ratios = []
@@ -127,10 +131,10 @@ func _update_segment_ratios(path_node :Node) -> void:
 		_segment_ratios.append(length / total_length)
 
 
-func _update_color(data_node :Node) -> void:
+func _update_color(data_node :Node, mask :int = 1) -> void:
 	var offsets := []
 	var colors := []
-	var point_colors :Array = data_node.get_colors(start,end)
+	var point_colors :Array = data_node.get_colors(start, end, mask)
 	if _segment_ratios.size() != point_colors.size():
 		return
 	
@@ -159,8 +163,8 @@ func _update_color(data_node :Node) -> void:
 	gradient.colors = colors
 
 
-func _update_width(data_node :Node) -> void:
-	var widths :Array = data_node.get_widths(start,end)
+func _update_width(data_node :Node, mask :int = 1) -> void:
+	var widths :Array = data_node.get_widths(start, end, mask)
 	if _segment_ratios.size() != widths.size():
 		return
 	if width_curve:
@@ -220,3 +224,12 @@ func _close() -> void:
 		var close_point := points[0] + start_vector * 0.1
 		_points.append(close_point)
 	points = _points
+
+
+func _get_layer_names(property_name :String) -> Array:
+	if property_name != "mask":
+		return []
+	var path_node = _get_path_node()
+	if ! path_node:
+		return []
+	return path_node._get_layer_names("tags")

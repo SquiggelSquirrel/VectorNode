@@ -4,7 +4,10 @@ class_name VectorFill
 # Polygon2D used as "fill" for a VectorPath
 
 export(NodePath) var path_node_path setget set_path_node_path
+export(int, FLAGS, "") var mask := 1
+
 var is_vector_fill := true
+
 onready var is_ready := true
 
 
@@ -25,7 +28,7 @@ func update_fill():
 	var node = _get_path_node()
 	if ! node:
 		return
-	polygon = node.get_shape(0,0)
+	polygon = node.get_shape(0,0,mask)
 
 
 func _get_path_node():
@@ -37,3 +40,12 @@ func _get_path_node():
 	if node.get('is_vector_path'):
 		return node
 	return null
+
+
+func _get_layer_names(property_name :String) -> Array:
+	if property_name != "mask":
+		return []
+	var path_node = _get_path_node()
+	if ! path_node:
+		return []
+	return path_node._get_layer_names("tags")
