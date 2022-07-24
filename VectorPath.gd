@@ -10,16 +10,21 @@ class_name VectorPath
 signal shape_changed
 signal stroke_data_changed
 
-var is_vector_path = true
+const ALL_TAGS = ~0
+
 export(float, 1.0, 100.0) var bake_interval = 10.0
 export(Color) var color_handle_in := Color.red setget set_color_handle_in
 export(Color) var color_handle_out := Color.green setget set_color_handle_out
 export(Color) var color_path := Color.lightgray setget set_color_path
+export(Array, String) var tag_names := []
+
+var is_vector_path = true
+
 var _curves := {}
 var _cached_bake_interval = 10.0
 
 
-func _process(_delta) -> void:
+func _process(_delta :float) -> void:
 	if get_shape_has_changed():
 		_expire_changed_curves()
 		emit_signal("shape_changed")
@@ -60,9 +65,9 @@ func set_color_path(new_color :Color) -> void:
 	update()
 
 
-func get_shape(start := 0.0, end := 0.0) -> Array:
+func get_shape(start := 0.0, end := 0.0, mask :int = 1) -> Array:
 	var shape :=  []
-	var curves := _get_curves(start, end)
+	var curves := _get_curves(start, end, mask)
 	var start_fraction := fposmod(start, 1.0)
 	var end_fraction := fposmod(end, 1.0)
 	var last_point
@@ -122,9 +127,9 @@ func get_shape(start := 0.0, end := 0.0) -> Array:
 	return shape
 
 
-func get_baked_lengths(start := 0.0, end := 0.0) -> Array:
+func get_baked_lengths(start := 0.0, end := 0.0, mask :int = 1) -> Array:
 	var lengths := []
-	var curves := _get_curves(start, end)
+	var curves := _get_curves(start, end, mask)
 	for i in curves.size():
 		var curve = curves[i]
 		
@@ -153,16 +158,16 @@ func get_baked_lengths(start := 0.0, end := 0.0) -> Array:
 	return lengths
 
 
-func get_colors(start := 0.0, end := 0.0) -> Array:
+func get_colors(start := 0.0, end := 0.0, mask :int = 1) -> Array:
 	var colors := []
-	for node in get_point_nodes(start, end):
+	for node in get_point_nodes(start, end, mask):
 		colors.append(node.stroke_color)
 	return colors
 
 
-func get_widths(start := 0.0, end := 0.0) -> Array:
+func get_widths(start := 0.0, end := 0.0, mask :int = 1) -> Array:
 	var widths := []
-	for node in get_point_nodes(start, end):
+	for node in get_point_nodes(start, end, mask):
 		widths.append(node.stroke_width)
 	return widths
 
@@ -170,14 +175,14 @@ func get_widths(start := 0.0, end := 0.0) -> Array:
 func get_shape_has_changed() -> bool:
 	if _cached_bake_interval != bake_interval:
 		return true
-	for point in get_point_nodes():
+	for point in get_point_nodes(ALL_TAGS):
 		if point.get_shape_has_changed():
 			return true
 	return false
 
 
 func get_stroke_data_has_changed() -> bool:
-	for point in get_point_nodes():
+	for point in get_point_nodes(ALL_TAGS):
 		if point.get_stroke_data_has_changed():
 			return true
 	return false
@@ -188,22 +193,23 @@ func set_shape_has_changed(new_value: bool) -> void:
 		_cached_bake_interval = null
 	else:
 		_cached_bake_interval = bake_interval
-	for point in get_point_nodes():
+	for point in get_point_nodes(ALL_TAGS):
 		point.set_shape_has_changed(new_value)
 
 
 func set_stroke_data_has_changed(new_value: bool) -> void:
-	for point in get_point_nodes():
+	for point in get_point_nodes(ALL_TAGS):
 		point.set_stroke_data_has_changed(new_value)
 
 
-func get_point_nodes(start := 0.0, end := 0.0) -> Array:
+func get_point_nodes(start := 0.0, end := 0.0, mask :int = 1) -> Array:
 	var points := []
 	for child in get_children():
-		if child.get("is_control_point"):
+		if child.get("is_control_point") and child.matches_mask(mask):
 			points.append(child)
 		if child.get("is_control_point_group"):
-			points += child.get_point_nodes();
+			for node in child.get_point_nodes(mask):
+				points.append(node)
 	return _get_array_range(points, start, end)
 
 
@@ -213,6 +219,8 @@ func range_is_closed(start :float, end:float) -> bool:
 
 
 func _get_array_range(array :Array, start :float, end:float) -> Array:
+	# Given an array of nodes, and start/end points, return the array of nodes
+	# required to encompass those points
 	if array.size() == 0:
 		return array
 	var fsize = float(array.size())
@@ -233,33 +241,33 @@ func _get_array_range(array :Array, start :float, end:float) -> Array:
 	return result
 
 
-func _get_curves(start := 0.0, end := 0.0) -> Array:
+func _get_curves(start := 0.0, end := 0.0, mask :int = 1) -> Array:
 	var curves := []
-	var point_nodes = get_point_nodes(start, end)
+	var point_nodes = get_point_nodes(start, end, mask)
 	for i in range(0, point_nodes.size() - 1):
-		curves.append(_get_curve(point_nodes[i], point_nodes[i+1]))
+		curves.append(_get_curve(point_nodes[i], point_nodes[i+1], mask))
 	return curves
 
 
-func _get_curve(start_point :Node, end_point :Node):
-	if _curves.has([start_point,end_point]):
-		return _curves[[start_point,end_point]]
+func _get_curve(start_point :Node, end_point :Node, mask :int = 1):
+	var handle_in = start_point.get_VectorHandle_out(mask)
+	var handle_out = end_point.get_VectorHandle_in(mask)
+	if _curves.has([start_point,handle_in,end_point,handle_out]):
+		return _curves[[start_point,handle_in,end_point,handle_out]]
 	else:
-		var curve = _get_new_curve(start_point, end_point)
-		_curves[[start_point,end_point]] = curve
+		var curve = _get_new_curve(start_point, end_point, mask)
+		_curves[[start_point,handle_in,end_point,handle_out]] = curve
 		return curve
 
 
-func _is_straight(start_point :Node, end_point :Node) -> bool:
-	return (
-			start_point.get_handle_out(self) == Vector2.ZERO
+func _is_straight(start_point :Node, end_point :Node, mask :int = 1) -> bool:
+	return (start_point.get_handle_out(self, mask) == Vector2.ZERO
 			and
-			end_point.get_handle_in(self) == Vector2.ZERO
-	);
+			end_point.get_handle_in(self, mask) == Vector2.ZERO)
 
 
-func _get_new_curve(start_point :Node, end_point :Node):
-	if _is_straight(start_point, end_point):
+func _get_new_curve(start_point :Node, end_point :Node, mask :int = 1):
+	if _is_straight(start_point, end_point, mask):
 		return [
 				start_point.get_position_in(self),
 				end_point.get_position_in(self)]
@@ -270,12 +278,12 @@ func _get_new_curve(start_point :Node, end_point :Node):
 		curve.bake_interval = start_point.bake_interval
 	curve.add_point(
 			start_point.get_position_in(self),
-			start_point.get_handle_in(self),
-			start_point.get_handle_out(self))
+			start_point.get_handle_in(self, mask),
+			start_point.get_handle_out(self, mask))
 	curve.add_point(
 			end_point.get_position_in(self),
-			end_point.get_handle_in(self),
-			end_point.get_handle_out(self))
+			end_point.get_handle_in(self, mask),
+			end_point.get_handle_out(self, mask))
 	return curve
 
 
@@ -283,11 +291,17 @@ func _expire_changed_curves() -> void:
 	var bake_interval_has_changed = _cached_bake_interval != bake_interval
 	for key in _curves.keys():
 		if (
-				key[0].get_has_changed() or key[0].get_handle_out_has_changed()
-				or
-				key[1].get_has_changed() or key[1].get_handle_in_has_changed()
-				or
 				(key[0].bake_interval < 1.0 and bake_interval_has_changed)
+				or key[0].get_has_changed() 
+				or ( key[1] and key[1].get_has_changed() )
+				or key[2].get_has_changed()
+				or ( key[3] and key[3].get_has_changed() )
 		):
 			# warning-ignore:return_value_discarded
 			_curves.erase(key)
+
+
+func _get_layer_names(property_name :String) -> Array:
+	if property_name != "tags":
+		return []
+	return tag_names
